@@ -1,5 +1,7 @@
 # listExtensions: bubbletea list bubbles extensions
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/plutonium-239/listExtensions.svg)](https://pkg.go.dev/github.com/plutonium-239/listExtensions)
+
 Provides 2 bubbles:
 1. `basiclist`: Basic list with no pagination, meant for use with viewport (see examples)
 2. `scrollinglist`: Scrollable list (no pagination), (see examples)
