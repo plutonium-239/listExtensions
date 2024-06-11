@@ -1,3 +1,4 @@
+// Package scrollinglist provides a scrollalbe list bubbletea component
 package scrollinglist
 
 import (
