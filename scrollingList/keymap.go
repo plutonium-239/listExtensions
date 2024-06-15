@@ -13,6 +13,36 @@ type KeyMap struct {
 
 	ShowFullHelp  key.Binding
 	CloseFullHelp key.Binding
+	ShowHideHelp  key.Binding
+	ToggleFooter  key.Binding
+}
+
+// FullHelp implements help.KeyMap.
+func (k KeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{
+			k.Down,
+			k.Up,
+			k.GotoBottom,
+			k.GotoTop,
+		},
+		{
+			k.ToggleFooter,
+			k.ShowHideHelp,
+			k.Quit,
+			k.CloseFullHelp,
+		},
+	}
+}
+
+// ShortHelp implements help.KeyMap.
+func (k KeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		k.Down,
+		k.Up,
+		k.Quit,
+		k.ShowFullHelp,
+	}
 }
 
 func DefaultKeyMap() KeyMap {
@@ -47,6 +77,14 @@ func DefaultKeyMap() KeyMap {
 		CloseFullHelp: key.NewBinding(
 			key.WithKeys("?"),
 			key.WithHelp("?", "close full help"),
+		),
+		ToggleFooter: key.NewBinding(
+			key.WithKeys("t"),
+			key.WithHelp("t", "toggle footer"),
+		),
+		ShowHideHelp: key.NewBinding(
+			key.WithKeys("y"),
+			key.WithHelp("y", "show/hide help"),
 		),
 	}
 }
