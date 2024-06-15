@@ -49,11 +49,11 @@ func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		Down: key.NewBinding(
 			key.WithKeys("down"),
-			key.WithHelp("↓", "move 1 line down"),
+			key.WithHelp("↓", "move down"),
 		),
 		Up: key.NewBinding(
 			key.WithKeys("up"),
-			key.WithHelp("↑", "move 1 line up"),
+			key.WithHelp("↑", "move up"),
 		),
 
 		GotoBottom: key.NewBinding(

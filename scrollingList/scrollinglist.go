@@ -328,4 +328,3 @@ func (sl *ScrollingList) GetCurrentVisibleRange() (int, int) {
 }
 
 // TODO: Add title similar to default list
-// TODO: help
