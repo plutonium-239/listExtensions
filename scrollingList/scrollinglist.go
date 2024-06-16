@@ -3,7 +3,6 @@ package scrollinglist
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -12,29 +11,22 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var DefaultUnfocusedStyle = lipgloss.NewStyle().
-	Border(lipgloss.HiddenBorder()).
-	BorderTop(false).BorderBottom(false).BorderRight(false).
-	PaddingLeft(1).
-	Foreground(lipgloss.Color("#C2B8C2"))
-
-var DefaultFocusedStyle = lipgloss.NewStyle().
-	Border(lipgloss.ThickBorder()).
-	BorderForeground(lipgloss.Color("197")).
-	BorderTop(false).BorderBottom(false).BorderRight(false).
-	PaddingLeft(1).
-	Foreground(lipgloss.Color("#EE6FF8"))
-
 type ScrollingList struct {
-	items   []fmt.Stringer
-	focused int
+	originalItems   []fmt.Stringer
+	lengths  []int
+	focusedID int
 
-	lengths     []int
+	// len(preRendered) NOT EQUAL TO len(lengths) = len(originalItems) 
+	// It is supposed to serve as a "flattened" version of the texts in original items
 	preRendered []string
+	itemIDs []int
+	focused int
+	firstVisible, lastVisible int
 
 	// Styles can be customized
 	UnfocusedStyle lipgloss.Style
 	FocusedStyle   lipgloss.Style
+	FocusedLineStyle lipgloss.Style
 
 	// Alignment of text within the list
 	ListAlignment lipgloss.Position
@@ -48,9 +40,6 @@ type ScrollingList struct {
 	help help.Model
 	// Help can be toggled
 	ShowHelp bool
-
-	firstVisible, lastVisible int
-	firstPartial, lastPartial int
 
 	// The number of lines to keep between focused item and screen edges
 	NumLinesFromBorder int
@@ -67,10 +56,12 @@ type ScrollingList struct {
 }
 
 func NewScrollingList() ScrollingList {
+	InitStyles()
 	return ScrollingList{
 		KeyMap:             DefaultKeyMap(),
 		UnfocusedStyle:     DefaultUnfocusedStyle,
 		FocusedStyle:       DefaultFocusedStyle,
+		FocusedLineStyle:   DefaultFocusedLineStyle,
 		ListAlignment:      lipgloss.Center,
 		GlobalAlignment:    lipgloss.Center,
 		NumLinesFromBorder: 5,
@@ -113,49 +104,29 @@ func (sl ScrollingList) View() string {
 
 // returns the visible lines, with partial first/last elements s.t. output fits on screen
 func (sl *ScrollingList) VisibleLines() []string {
-	if len(sl.items) == 0 {
+	if len(sl.originalItems) == 0 {
 		return []string{}
 	}
-	potentialRendered := sl.preRendered[sl.firstVisible+1 : sl.lastVisible]
+	potentialRendered := sl.preRendered[sl.firstVisible : sl.lastVisible+1]
 
 	// potentialRendered[sl.Focused] = sl.FocusedStyle.Render(potentialRendered[sl.Focused])
-	potentialLength := 0
+	// potentialLength := 0
 	styledRendered := make([]string, len(potentialRendered))
-	for i := sl.firstVisible + 1; i < sl.lastVisible; i++ {
-		potentialLength += sl.lengths[i]
-		styledRendered[i-sl.firstVisible-1] = sl.styleSingle(i)
+	for i := sl.firstVisible; i <= sl.lastVisible; i++ {
+		// potentialLength += sl.lengths[i]
+		styledRendered[i-sl.firstVisible] = sl.styleSingle(i)
 	}
 	// result := lipgloss.JoinVertical(lipgloss.Left, styledRendered...)
 	result := styledRendered
-
-	// reqd_lines := sl.Height - potentialLength
-	// if reqd_lines > 0 {
-	if sl.firstPartial >= 0 {
-		s_split := strings.Split(sl.styleSingle(sl.firstVisible), "\n")
-		if sl.firstPartial == 0 {
-			sl.firstPartial = len(s_split)
-		}
-		s := strings.Join(s_split[len(s_split)-sl.firstPartial:], "\n")
-		// result = lipgloss.JoinVertical(lipgloss.Left, s, result)
-		result = slices.Insert(result, 0, s)
-	}
-	if sl.lastPartial >= 0 {
-		s_split := strings.Split(sl.styleSingle(sl.lastVisible), "\n")
-		if sl.lastPartial == 0 {
-			sl.lastPartial = len(s_split)
-		}
-		s := strings.Join(s_split[:sl.lastPartial], "\n")
-		// result = lipgloss.JoinVertical(lipgloss.Left, result, s)
-		result = append(result, s)
-	}
-	// }
-	// potentialRendered = append(potentialRendered, )
 
 	return result
 }
 
 func (sl *ScrollingList) styleSingle(index int) string {
 	if index == sl.focused {
+		return sl.FocusedLineStyle.Render(sl.preRendered[index])
+	}
+	if sl.itemIDs[index] == sl.focusedID {
 		return sl.FocusedStyle.Render(sl.preRendered[index])
 	}
 	return sl.UnfocusedStyle.Render(sl.preRendered[index])
@@ -167,8 +138,8 @@ func (sl *ScrollingList) FooterView() string {
 	if sl.CustomFooter != nil {
 		return sl.CustomFooter()
 	}
-	return fmt.Sprintf("Focused:%d, FirstVisible:%d, LastVisible:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d", 
-	sl.focused, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight)
+	return fmt.Sprintf("Focused:%d (ID=%d), First:%d, Last:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d", 
+	sl.focused, sl.focusedID, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight)
 }
 
 // returns the rendered help
@@ -188,6 +159,12 @@ func (sl ScrollingList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return sl, nil
 		case key.Matches(msg, sl.KeyMap.Up):
 			sl.Prev()
+			return sl, nil
+		case key.Matches(msg, sl.KeyMap.PageDown):
+			sl.PageDown()
+			return sl, nil
+		case key.Matches(msg, sl.KeyMap.PageUp):
+			sl.PageUp()
 			return sl, nil
 		case key.Matches(msg, sl.KeyMap.GotoBottom):
 			sl.GotoBottom()
@@ -211,7 +188,8 @@ func (sl ScrollingList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		sl.SetSize(msg.Width, msg.Height)
 		// TODO: find a way to persist through screen resize, this starts by deciding whether to keep focused closer to top or bottom (or middle?)
-		sl.lastVisible, sl.lastPartial = PrefixSumBreak(sl.lengths[:len(sl.lengths)-1], sl.scrollHeight)
+		// sl.lastVisible, _ = PrefixSumBreak(sl.lengths[:len(sl.lengths)-1], sl.scrollHeight)
+		sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
 		return sl, nil
 	}
 	return sl, nil
@@ -219,28 +197,29 @@ func (sl ScrollingList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // Replace all items
 func (sl *ScrollingList) SetItems(items []fmt.Stringer) {
-	sl.items = items
-	sl.preRendered = make([]string, len(items))
+	sl.originalItems = items
+	sl.preRendered = make([]string, 0)
+	sl.itemIDs = make([]int, 0)
 	sl.lengths = make([]int, len(items))
 	for i := range items {
-		sl.recalculateForIndex(i)
+		fulltextSplit := strings.Split(sl.originalItems[i].String(), "\n")
+		for _, line := range fulltextSplit {
+			sl.preRendered = append(sl.preRendered, line)
+			sl.itemIDs = append(sl.itemIDs, i)
+		}
+		// sl.preRendered = 
+		sl.lengths[i] = len(fulltextSplit)
 	}
-	sl.firstPartial = sl.lengths[0]
 	if sl.initialized {
-		sl.lastVisible, sl.lastPartial = PrefixSumBreak(sl.lengths[:len(sl.lengths)-1], sl.scrollHeight)
+		// sl.lastVisible, _ = PrefixSumBreak(sl.lengths[:len(sl.lengths)-1], sl.scrollHeight)
+		sl.lastVisible = sl.scrollHeight - 1
 	}
 }
 
 // Replace one item at index int with given item
 func (sl *ScrollingList) SetItemAt(item fmt.Stringer, index int) {
-	sl.items[index] = item
-	sl.recalculateForIndex(index)
-}
-
-// update internal preRendered and lengths for the item at index
-func (sl *ScrollingList) recalculateForIndex(index int) {
-	sl.preRendered[index] = sl.items[index].String()
-	sl.lengths[index] = len(strings.Split(sl.preRendered[index], "\n"))
+	sl.originalItems[index] = item
+	sl.SetItems(sl.originalItems)
 }
 
 // Move 1 item up
@@ -249,48 +228,66 @@ func (sl *ScrollingList) Prev() {
 		return
 	}
 	sl.focused--
+	sl.focusedID = sl.itemIDs[sl.focused]
 	sl.status = "Going Up"
 	if sl.focused < sl.firstVisible+sl.NumLinesFromBorder && sl.firstVisible > 0 {
 		sl.firstVisible--
-		var update int
-		update, sl.lastPartial = SuffixSumBreak(sl.lengths[sl.firstVisible:sl.lastVisible], sl.lengths[sl.firstVisible])
-		sl.lastVisible -= update
+		sl.lastVisible--
 	}
 }
 
 // Move 1 item down
 func (sl *ScrollingList) Next() {
-	if sl.focused >= len(sl.items)-1 {
+	if sl.focused >= len(sl.itemIDs) - 1 {
 		return
 	}
 	sl.focused++
+	sl.focusedID = sl.itemIDs[sl.focused]
 	sl.status = "Going Down"
-	if sl.focused > sl.lastVisible-sl.NumLinesFromBorder && sl.lastVisible < len(sl.items)-1 {
+	if sl.focused > sl.lastVisible-sl.NumLinesFromBorder && sl.lastVisible < len(sl.itemIDs)-1 {
 		sl.lastVisible++
-		var update int
-		update, sl.firstPartial = PrefixSumBreak(sl.lengths[sl.firstVisible:sl.lastVisible], sl.lengths[sl.lastVisible])
-		sl.firstVisible += 1 + update
+		sl.firstVisible++
 	}
 }
 
-// Go to last item
-func (sl *ScrollingList) GotoBottom() {
-	sl.lastVisible = len(sl.items) - 1
-	sl.lastPartial = 0
-	sl.status = "At Bottom"
-	var update int
-	update, sl.firstPartial = SuffixSumBreak(sl.lengths, sl.Height)
-	sl.firstVisible = len(sl.lengths) - update
-	sl.focused = sl.lastVisible - sl.NumLinesFromBorder
+// Move 1 page up
+func (sl *ScrollingList) PageUp() {
+	h := sl.scrollHeight - 1
+	sl.setFirst(sl.firstVisible - h)
+	sl.focused -= h
+	sl.focused = max(sl.focused, sl.firstVisible)
+	sl.setLast(sl.firstVisible + h)
+	sl.focusedID = sl.itemIDs[sl.focused]
+	sl.status = "Page Up"
+}
+
+// Move 1 page down
+func (sl *ScrollingList) PageDown() {
+	h := sl.scrollHeight - 1
+	sl.setLast(sl.lastVisible + h)
+	sl.focused += h
+	sl.focused = min(sl.focused, sl.lastVisible)
+	sl.setFirst(sl.lastVisible - h)
+	sl.focusedID = sl.itemIDs[sl.focused]
+	sl.status = "Page Down"
 }
 
 // Go to first item
 func (sl *ScrollingList) GotoTop() {
 	sl.firstVisible = 0
-	sl.firstPartial = 0
 	sl.status = "At Top"
-	sl.lastVisible, sl.lastPartial = PrefixSumBreak(sl.lengths[:len(sl.lengths)-1], sl.scrollHeight)
-	sl.focused = sl.firstVisible + sl.NumLinesFromBorder
+	sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
+	sl.focused = sl.firstVisible
+	sl.focusedID = sl.itemIDs[sl.focused]
+}
+
+// Go to last item
+func (sl *ScrollingList) GotoBottom() {
+	sl.lastVisible = len(sl.itemIDs) - 1
+	sl.status = "At Bottom"
+	sl.setFirst(sl.lastVisible - (sl.scrollHeight - 1))
+	sl.focused = sl.lastVisible
+	sl.focusedID = sl.itemIDs[sl.focused]
 }
 
 // Set the width and height for list and set initialized
@@ -306,14 +303,10 @@ func (sl *ScrollingList) SetSize(width, height int) {
 	}
 	sl.Width = width
 	sl.help.Width = width
-	if sl.lastVisible < len(sl.lengths) - 1 - sl.NumLinesFromBorder {
-		var update int
-		update, sl.lastPartial = PrefixSumBreak(sl.lengths[sl.firstVisible:], sl.scrollHeight)
-		sl.lastVisible = sl.firstVisible + update
+	if sl.lastVisible < len(sl.itemIDs) - 1 - sl.NumLinesFromBorder {
+		sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
 	} else {
-		var update int
-		update, sl.firstPartial = SuffixSumBreak(sl.lengths[:sl.lastVisible], sl.scrollHeight)
-		sl.firstVisible = sl.lastVisible - update
+		sl.setFirst(sl.lastVisible - (sl.scrollHeight - 1))
 	}
 }
 
@@ -327,4 +320,13 @@ func (sl *ScrollingList) GetCurrentVisibleRange() (int, int) {
 	return sl.firstVisible, sl.lastVisible
 }
 
+// Convenience funcitions
+func (sl *ScrollingList) setFirst(value int) {
+	sl.firstVisible = max(value, 0)
+}
+func (sl *ScrollingList) setLast(value int) {
+	sl.lastVisible = min(value, len(sl.itemIDs) - 1)
+}
+
 // TODO: Add title similar to default list
+// TODO: Pgup, Pgdn -> j,k?

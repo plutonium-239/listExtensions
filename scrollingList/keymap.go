@@ -6,6 +6,9 @@ type KeyMap struct {
 	Down key.Binding
 	Up   key.Binding
 
+	PageDown key.Binding
+	PageUp   key.Binding
+
 	GotoBottom key.Binding
 	GotoTop    key.Binding
 
@@ -23,6 +26,8 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{
 			k.Down,
 			k.Up,
+			k.PageDown,
+			k.PageUp,
 			k.GotoBottom,
 			k.GotoTop,
 		},
@@ -54,6 +59,15 @@ func DefaultKeyMap() KeyMap {
 		Up: key.NewBinding(
 			key.WithKeys("up"),
 			key.WithHelp("↑", "move up"),
+		),
+
+		PageDown: key.NewBinding(
+			key.WithKeys("k"),
+			key.WithHelp("k", "page down"),
+		),
+		PageUp: key.NewBinding(
+			key.WithKeys("j"),
+			key.WithHelp("j", "page up"),
 		),
 
 		GotoBottom: key.NewBinding(
