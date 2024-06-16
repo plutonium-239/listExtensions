@@ -2,6 +2,10 @@ module github.com/plutonium-239/listExtensions
 
 go 1.22.3
 
+retract (
+	[v1.0.0, v1.0.2]
+)
+
 require (
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.4
