@@ -12,21 +12,23 @@ import (
 )
 
 type ScrollingList struct {
-	originalItems   []fmt.Stringer
-	lengths  []int
-	focusedID int
+	originalItems []fmt.Stringer
+	lengths       []int
+	focusedID     int
 
-	// len(preRendered) NOT EQUAL TO len(lengths) = len(originalItems) 
+	// len(preRendered) NOT EQUAL TO len(lengths) = len(originalItems)
 	// It is supposed to serve as a "flattened" version of the texts in original items
-	preRendered []string
-	itemIDs []int
-	focused int
+	preRendered               []string
+	itemIDs                   []int
+	focused                   int
 	firstVisible, lastVisible int
 
 	// Styles can be customized
-	UnfocusedStyle lipgloss.Style
-	FocusedStyle   lipgloss.Style
+	UnfocusedStyle   lipgloss.Style
+	FocusedStyle     lipgloss.Style
 	FocusedLineStyle lipgloss.Style
+	FooterStyle      lipgloss.Style
+	TitleStyle       lipgloss.Style
 
 	// Alignment of text within the list
 	ListAlignment lipgloss.Position
@@ -34,10 +36,14 @@ type ScrollingList struct {
 	GlobalAlignment lipgloss.Position
 
 	// Footer can be toggled and customized, can be multiline
-	ShowFooter bool
+	ShowFooter   bool
 	CustomFooter func() string
+	// Title
+	Title string
+	// Title can be toggled
+	ShowTitle bool
 
-	help help.Model
+	Help help.Model
 	// Help can be toggled
 	ShowHelp bool
 
@@ -46,7 +52,7 @@ type ScrollingList struct {
 
 	// Size of the whole list (scroll height is handled automatically based on footer/help)
 	Width, Height int
-	scrollHeight int
+	scrollHeight  int
 
 	initialized bool
 	// KeyMap
@@ -62,12 +68,15 @@ func NewScrollingList() ScrollingList {
 		UnfocusedStyle:     DefaultUnfocusedStyle,
 		FocusedStyle:       DefaultFocusedStyle,
 		FocusedLineStyle:   DefaultFocusedLineStyle,
+		FooterStyle:        DefaultFooterStyle,
+		TitleStyle:         DefaultTitleStyle,
 		ListAlignment:      lipgloss.Center,
 		GlobalAlignment:    lipgloss.Center,
 		NumLinesFromBorder: 5,
-		ShowFooter:       true,
-		ShowHelp: true,
-		help: help.New(),
+		ShowFooter:         true,
+		ShowTitle:          true,
+		ShowHelp:           true,
+		Help:               help.New(),
 	}
 }
 
@@ -87,6 +96,10 @@ func (sl ScrollingList) View() string {
 		return "..."
 	}
 	views := make([]string, 0)
+
+	if sl.ShowTitle {
+		views = append(views, sl.place(sl.TitleView()))
+	}
 
 	views = append(views, lipgloss.JoinVertical(sl.ListAlignment, sl.VisibleLines()...))
 	if sl.ShowFooter {
@@ -132,19 +145,25 @@ func (sl *ScrollingList) styleSingle(index int) string {
 	return sl.UnfocusedStyle.Render(sl.preRendered[index])
 }
 
+func (sl *ScrollingList) TitleView() string {
+	return sl.TitleStyle.Render(sl.place(sl.Title))
+}
+
 // returns the rendered footer
 func (sl *ScrollingList) FooterView() string {
 	// ShowFooter handling is done in View
 	if sl.CustomFooter != nil {
 		return sl.CustomFooter()
 	}
-	return fmt.Sprintf("Focused:%d (ID=%d), First:%d, Last:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d", 
-	sl.focused, sl.focusedID, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight)
+	return sl.FooterStyle.Render(sl.place(
+		fmt.Sprintf("Focused:%d (ID=%d), First:%d, Last:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d",
+			sl.focused, sl.focusedID, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight),
+	))
 }
 
 // returns the rendered help
 func (sl *ScrollingList) HelpView() string {
-	return sl.help.View(sl.KeyMap)
+	return sl.Help.View(sl.KeyMap)
 }
 
 // BubbleTea Update method, handles key presses and window resize
@@ -181,7 +200,7 @@ func (sl ScrollingList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			sl.SetSize(sl.Width, sl.Height)
 			return sl, nil
 		case key.Matches(msg, sl.KeyMap.ShowFullHelp, sl.KeyMap.CloseFullHelp):
-			sl.help.ShowAll = !sl.help.ShowAll
+			sl.Help.ShowAll = !sl.Help.ShowAll
 			sl.SetSize(sl.Width, sl.Height)
 			return sl, nil
 		}
@@ -207,7 +226,7 @@ func (sl *ScrollingList) SetItems(items []fmt.Stringer) {
 			sl.preRendered = append(sl.preRendered, line)
 			sl.itemIDs = append(sl.itemIDs, i)
 		}
-		// sl.preRendered = 
+		// sl.preRendered =
 		sl.lengths[i] = len(fulltextSplit)
 	}
 	if sl.initialized {
@@ -238,7 +257,7 @@ func (sl *ScrollingList) Prev() {
 
 // Move 1 item down
 func (sl *ScrollingList) Next() {
-	if sl.focused >= len(sl.itemIDs) - 1 {
+	if sl.focused >= len(sl.itemIDs)-1 {
 		return
 	}
 	sl.focused++
@@ -295,6 +314,9 @@ func (sl *ScrollingList) SetSize(width, height int) {
 	sl.initialized = true
 	sl.Height = height
 	sl.scrollHeight = height
+	if sl.ShowTitle {
+		sl.scrollHeight -= lipgloss.Height(sl.TitleView())
+	}
 	if sl.ShowFooter {
 		sl.scrollHeight -= lipgloss.Height(sl.FooterView())
 	}
@@ -302,8 +324,8 @@ func (sl *ScrollingList) SetSize(width, height int) {
 		sl.scrollHeight -= lipgloss.Height(sl.HelpView())
 	}
 	sl.Width = width
-	sl.help.Width = width
-	if sl.lastVisible < len(sl.itemIDs) - 1 - sl.NumLinesFromBorder {
+	sl.Help.Width = width
+	if sl.lastVisible < len(sl.itemIDs)-1-sl.NumLinesFromBorder {
 		sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
 	} else {
 		sl.setFirst(sl.lastVisible - (sl.scrollHeight - 1))
@@ -325,8 +347,7 @@ func (sl *ScrollingList) setFirst(value int) {
 	sl.firstVisible = max(value, 0)
 }
 func (sl *ScrollingList) setLast(value int) {
-	sl.lastVisible = min(value, len(sl.itemIDs) - 1)
+	sl.lastVisible = min(value, len(sl.itemIDs)-1)
 }
 
 // TODO: Add title similar to default list
-// TODO: Pgup, Pgdn -> j,k?
