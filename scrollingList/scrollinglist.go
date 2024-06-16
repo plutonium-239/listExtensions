@@ -336,9 +336,14 @@ func (sl *ScrollingList) SetSize(width, height int) {
 	}
 }
 
-// Returns the currently focused index
-func (sl *ScrollingList) GetFocused() int {
+// Returns the currently focused line
+func (sl *ScrollingList) GetFocusedLine() int {
 	return sl.focused
+}
+
+// Returns the currently focused item id
+func (sl *ScrollingList) GetFocused() int {
+	return sl.focusedID
 }
 
 // Returns the currently visible first and last indices
