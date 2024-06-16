@@ -18,6 +18,7 @@ type KeyMap struct {
 	CloseFullHelp key.Binding
 	ShowHideHelp  key.Binding
 	ToggleFooter  key.Binding
+	ToggleTitle   key.Binding
 }
 
 // FullHelp implements help.KeyMap.
@@ -32,6 +33,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 			k.GotoTop,
 		},
 		{
+			k.ToggleTitle,
 			k.ToggleFooter,
 			k.ShowHideHelp,
 			k.Quit,
@@ -95,6 +97,10 @@ func DefaultKeyMap() KeyMap {
 		ToggleFooter: key.NewBinding(
 			key.WithKeys("t"),
 			key.WithHelp("t", "toggle footer"),
+		),
+		ToggleTitle: key.NewBinding(
+			key.WithKeys("T"),
+			key.WithHelp("T(shift+t)", "toggle title"),
 		),
 		ShowHideHelp: key.NewBinding(
 			key.WithKeys("y"),

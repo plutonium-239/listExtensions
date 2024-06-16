@@ -195,6 +195,10 @@ func (sl ScrollingList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			sl.ShowFooter = !sl.ShowFooter
 			sl.SetSize(sl.Width, sl.Height)
 			return sl, nil
+		case key.Matches(msg, sl.KeyMap.ToggleTitle):
+			sl.ShowTitle = !sl.ShowTitle
+			sl.SetSize(sl.Width, sl.Height)
+			return sl, nil
 		case key.Matches(msg, sl.KeyMap.ShowHideHelp):
 			sl.ShowHelp = !sl.ShowHelp
 			sl.SetSize(sl.Width, sl.Height)
@@ -349,5 +353,3 @@ func (sl *ScrollingList) setFirst(value int) {
 func (sl *ScrollingList) setLast(value int) {
 	sl.lastVisible = min(value, len(sl.itemIDs)-1)
 }
-
-// TODO: Add title similar to default list
