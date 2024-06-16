@@ -22,3 +22,4 @@ import (
 newlist := listx.NewScrollingList()
 ```
 
+Please refer to the short [example script](/scrollingList/examples/main.go) on more details.
