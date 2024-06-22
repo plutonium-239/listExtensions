@@ -58,12 +58,38 @@ func main() {
 	list.SetItems(items)
 	list.ListAlignment = lipgloss.Center
 	list.Title = "\"Top 10 staTues tHat CriEd bloOd\"\nBring Me The Horizon"
+	m := model{list: list}
 	err := tea.NewProgram(
-		list,
+		m,
 		tea.WithAltScreen(),
 	).Start()
 	if err != nil {
 		panic(fmt.Sprintf("error in making progam: %v", err))
 	}
 
+}
+
+type model struct {
+	list  listx.ScrollingList
+}
+
+func (m model) Init() tea.Cmd {
+	return nil
+}
+
+func (m model) View() string {
+	return m.list.View()
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "x" {
+			m.list.SetItemAt(item{"changed"}, m.list.GetFocused())
+			return m, nil
+		}
+	}
+	t, cmd := m.list.Update(msg)
+	m.list = t.(listx.ScrollingList)
+	return m, cmd
 }
