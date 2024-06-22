@@ -3,6 +3,7 @@ package scrollinglist
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -246,12 +247,59 @@ func (sl *ScrollingList) initOrReinit() {
 		// i.e. sl.setlast chose len(lines) as minimum
 		sl.setFirst(sl.firstVisible + diff)
 	}
+	sl.ensureFocusedInBounds()
+}
+
+func (sl *ScrollingList) ensureFocusedInBounds() {
+	sl.focused = max(sl.firstVisible, sl.focused)
+	sl.focused = min(sl.lastVisible, sl.focused)
+	sl.focusedID = sl.itemIDs[sl.focused]
 }
 
 // Replace one item at index int with given item
 func (sl *ScrollingList) SetItemAt(item fmt.Stringer, index int) {
+	sl.status = fmt.Sprintf("ID%d updated", index)
+	oldLen := sl.lengths[index]
 	sl.originalItems[index] = item
 	sl.SetItems(sl.originalItems)
+	diff := sl.lengths[index] - oldLen
+
+	// TODO: Implement a == case properly (so that it stays same distance away from itemID start)
+	if index <= sl.focusedID {
+		sl.focused += diff
+	} else {
+		// Is there enough (i.e. -diff)no. of lines after lastvisible to fill up screen?
+		if sl.lastVisible >= len(sl.itemIDs)-1-(-diff) {
+			// Ans: No, need to set lastvisible to very last line
+			diffFromEnd := sl.lastVisible - sl.focused
+			sl.lastVisible = len(sl.itemIDs) - 1
+			sl.focused = sl.lastVisible - diffFromEnd
+		}
+	}
+
+	sl.ensureFocusedInBounds()
+}
+
+// Delete one item at index int
+func (sl *ScrollingList) DeleteItemAt(index int) {
+	sl.status = fmt.Sprintf("ID%d deleted", index)
+	oldLen := sl.lengths[index]
+	sl.originalItems = slices.Concat(sl.originalItems[:index], sl.originalItems[index+1:])
+	sl.SetItems(sl.originalItems)
+
+	// Go to last line of item with ID = index - 1
+	if index == sl.focusedID {
+		for i := sl.focused; i >= sl.firstVisible; i-- {
+			if sl.itemIDs[i] == sl.focusedID-1 {
+				sl.focused = i
+				sl.focusedID -= 1
+				break
+			}
+		}
+	} else if index < sl.focusedID {
+		sl.focused -= oldLen
+		sl.ensureFocusedInBounds()
+	}
 }
 
 // Move 1 item up

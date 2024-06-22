@@ -87,6 +87,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "x" {
 			m.list.SetItemAt(item{"changed"}, m.list.GetFocused())
 			return m, nil
+		} else if msg.String() == "delete" {
+			m.list.DeleteItemAt(m.list.GetFocused())
+			return m, nil
 		}
 	}
 	t, cmd := m.list.Update(msg)
