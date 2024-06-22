@@ -55,7 +55,8 @@ type ScrollingList struct {
 	Width, Height int
 	scrollHeight  int
 
-	initialized bool
+	initialized      bool
+	initializedItems bool
 	// KeyMap
 	KeyMap KeyMap
 
@@ -78,6 +79,7 @@ func NewScrollingList() ScrollingList {
 		ShowTitle:          true,
 		ShowHelp:           true,
 		Help:               help.New(),
+		status:             "uninitialized",
 	}
 }
 
@@ -234,6 +236,7 @@ func (sl *ScrollingList) SetItems(items []fmt.Stringer) {
 		// sl.preRendered =
 		sl.lengths[i] = len(fulltextSplit)
 	}
+	sl.initializedItems = true
 	if sl.initialized {
 		// sl.lastVisible, _ = PrefixSumBreak(sl.lengths[:len(sl.lengths)-1], sl.scrollHeight)
 		// sl.lastVisible = sl.scrollHeight - 1
@@ -242,6 +245,9 @@ func (sl *ScrollingList) SetItems(items []fmt.Stringer) {
 }
 
 func (sl *ScrollingList) initOrReinit() {
+	if !sl.initializedItems {
+		return
+	}
 	sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
 	if diff := sl.lastVisible - sl.firstVisible - sl.scrollHeight + 1; diff < 0 {
 		// i.e. sl.setlast chose len(lines) as minimum
@@ -253,11 +259,20 @@ func (sl *ScrollingList) initOrReinit() {
 func (sl *ScrollingList) ensureFocusedInBounds() {
 	sl.focused = max(sl.firstVisible, sl.focused)
 	sl.focused = min(sl.lastVisible, sl.focused)
+}
+
+func (sl *ScrollingList) setFocusedID() {
+	if !sl.initializedItems {
+		return
+	}
 	sl.focusedID = sl.itemIDs[sl.focused]
 }
 
 // Replace one item at index int with given item
 func (sl *ScrollingList) SetItemAt(item fmt.Stringer, index int) {
+	if !sl.initializedItems {
+		return
+	}
 	sl.status = fmt.Sprintf("ID%d updated", index)
 	oldLen := sl.lengths[index]
 	sl.originalItems[index] = item
@@ -282,6 +297,9 @@ func (sl *ScrollingList) SetItemAt(item fmt.Stringer, index int) {
 
 // Delete one item at index int
 func (sl *ScrollingList) DeleteItemAt(index int) {
+	if !sl.initializedItems {
+		return
+	}
 	sl.status = fmt.Sprintf("ID%d deleted", index)
 	oldLen := sl.lengths[index]
 	sl.originalItems = slices.Concat(sl.originalItems[:index], sl.originalItems[index+1:])
@@ -308,7 +326,7 @@ func (sl *ScrollingList) Prev() {
 		return
 	}
 	sl.focused--
-	sl.focusedID = sl.itemIDs[sl.focused]
+	sl.setFocusedID()
 	sl.status = "Going Up"
 	if sl.focused < sl.firstVisible+sl.NumLinesFromBorder && sl.firstVisible > 0 {
 		sl.firstVisible--
@@ -322,7 +340,7 @@ func (sl *ScrollingList) Next() {
 		return
 	}
 	sl.focused++
-	sl.focusedID = sl.itemIDs[sl.focused]
+	sl.setFocusedID()
 	sl.status = "Going Down"
 	if sl.focused > sl.lastVisible-sl.NumLinesFromBorder && sl.lastVisible < len(sl.itemIDs)-1 {
 		sl.lastVisible++
@@ -337,7 +355,7 @@ func (sl *ScrollingList) PageUp() {
 	sl.focused -= h
 	sl.focused = max(sl.focused, sl.firstVisible)
 	sl.setLast(sl.firstVisible + h)
-	sl.focusedID = sl.itemIDs[sl.focused]
+	sl.setFocusedID()
 	sl.status = "Page Up"
 }
 
@@ -348,7 +366,7 @@ func (sl *ScrollingList) PageDown() {
 	sl.focused += h
 	sl.focused = min(sl.focused, sl.lastVisible)
 	sl.setFirst(sl.lastVisible - h)
-	sl.focusedID = sl.itemIDs[sl.focused]
+	sl.setFocusedID()
 	sl.status = "Page Down"
 }
 
@@ -358,7 +376,7 @@ func (sl *ScrollingList) GotoTop() {
 	sl.status = "At Top"
 	sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
 	sl.focused = sl.firstVisible
-	sl.focusedID = sl.itemIDs[sl.focused]
+	sl.setFocusedID()
 }
 
 // Go to last item
@@ -367,7 +385,7 @@ func (sl *ScrollingList) GotoBottom() {
 	sl.status = "At Bottom"
 	sl.setFirst(sl.lastVisible - (sl.scrollHeight - 1))
 	sl.focused = sl.lastVisible
-	sl.focusedID = sl.itemIDs[sl.focused]
+	sl.setFocusedID()
 }
 
 // Set the width and height for list and set initialized
