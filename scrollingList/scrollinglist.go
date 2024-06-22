@@ -212,7 +212,7 @@ func (sl ScrollingList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		sl.SetSize(msg.Width, msg.Height)
 		// TODO: find a way to persist through screen resize, this starts by deciding whether to keep focused closer to top or bottom (or middle?)
 		// sl.lastVisible, _ = PrefixSumBreak(sl.lengths[:len(sl.lengths)-1], sl.scrollHeight)
-		sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
+		sl.initOrReinit()
 		return sl, nil
 	}
 	return sl, nil
@@ -235,7 +235,16 @@ func (sl *ScrollingList) SetItems(items []fmt.Stringer) {
 	}
 	if sl.initialized {
 		// sl.lastVisible, _ = PrefixSumBreak(sl.lengths[:len(sl.lengths)-1], sl.scrollHeight)
-		sl.lastVisible = sl.scrollHeight - 1
+		// sl.lastVisible = sl.scrollHeight - 1
+		sl.initOrReinit()
+	}
+}
+
+func (sl *ScrollingList) initOrReinit() {
+	sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
+	if diff := sl.lastVisible - sl.firstVisible - sl.scrollHeight + 1; diff < 0 {
+		// i.e. sl.setlast chose len(lines) as minimum
+		sl.setFirst(sl.firstVisible + diff)
 	}
 }
 
