@@ -120,7 +120,7 @@ func (sl ScrollingList) View() string {
 
 // returns the visible lines, with partial first/last elements s.t. output fits on screen
 func (sl *ScrollingList) VisibleLines() []string {
-	if len(sl.originalItems) == 0 {
+	if !sl.initializedItems {
 		return []string{}
 	}
 	potentialRendered := sl.preRendered[sl.firstVisible : sl.lastVisible+1]
@@ -155,13 +155,14 @@ func (sl *ScrollingList) TitleView() string {
 // returns the rendered footer
 func (sl *ScrollingList) FooterView() string {
 	// ShowFooter handling is done in View
+	var text string
 	if sl.CustomFooter != nil {
-		return sl.CustomFooter()
+		text = sl.CustomFooter()
+	} else {
+		text = fmt.Sprintf("Focused:%d (ID=%d), First:%d, Last:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d",
+			sl.focused, sl.focusedID, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight)
 	}
-	return sl.FooterStyle.Render(sl.place(
-		fmt.Sprintf("Focused:%d (ID=%d), First:%d, Last:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d",
-			sl.focused, sl.focusedID, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight),
-	))
+	return sl.FooterStyle.Render(sl.place(text))
 }
 
 // returns the rendered help
@@ -424,6 +425,11 @@ func (sl *ScrollingList) GetFocused() int {
 // Returns the currently visible first and last indices
 func (sl *ScrollingList) GetCurrentVisibleRange() (int, int) {
 	return sl.firstVisible, sl.lastVisible
+}
+
+// Returns the current status
+func (sl *ScrollingList) GetStatus() string {
+	return sl.status
 }
 
 // Convenience funcitions
