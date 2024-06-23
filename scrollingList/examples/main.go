@@ -59,6 +59,7 @@ func main() {
 	list.ListAlignment = lipgloss.Center
 	list.Title = "\"Top 10 staTues tHat CriEd bloOd\"\nBring Me The Horizon"
 	m := model{list: list}
+	// m.list.CustomFooter = MakeCustomFooter
 	err := tea.NewProgram(
 		m,
 		tea.WithAltScreen(),
@@ -67,6 +68,11 @@ func main() {
 		panic(fmt.Sprintf("error in making progam: %v", err))
 	}
 
+}
+
+func MakeCustomFooter(list *listx.ScrollingList) string {
+	x := fmt.Sprintf("Focused: %d (ID=%d) | Status: %s", list.GetFocusedLine(), list.GetFocused(), list.GetStatus())
+	return x
 }
 
 type model struct {
@@ -91,6 +97,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.DeleteItemAt(m.list.GetFocused())
 			return m, nil
 		}
+	case tea.WindowSizeMsg:
+		t, cmd := m.list.Update(tea.WindowSizeMsg{Width: msg.Width/4, Height: msg.Height})
+		m.list = t.(listx.ScrollingList)
+		return m, cmd
 	}
 	t, cmd := m.list.Update(msg)
 	m.list = t.(listx.ScrollingList)

@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type ScrollingList struct {
@@ -38,7 +39,7 @@ type ScrollingList struct {
 
 	// Footer can be toggled and customized, can be multiline
 	ShowFooter   bool
-	CustomFooter func() string
+	CustomFooter func(*ScrollingList) string
 	// Title
 	Title string
 	// Title can be toggled
@@ -88,7 +89,11 @@ func (sl ScrollingList) Init() tea.Cmd {
 	return nil
 }
 
-func (sl *ScrollingList) place(view string) string {
+func (sl *ScrollingList) place(view string, truncate bool) string {
+	if truncate && len(strings.Split(view, "\n")) == 1 {
+		// TODO: TRUNCATE FOR MULTILINE
+		view = ansi.Truncate(view, sl.Width, "…")
+	}
 	return lipgloss.PlaceHorizontal(sl.Width, sl.GlobalAlignment, view)
 }
 
@@ -101,19 +106,19 @@ func (sl ScrollingList) View() string {
 	views := make([]string, 0)
 
 	if sl.ShowTitle {
-		views = append(views, sl.place(sl.TitleView()))
+		views = append(views, sl.TitleView())
 	}
 
 	views = append(views, lipgloss.JoinVertical(sl.ListAlignment, sl.VisibleLines()...))
 	if sl.ShowFooter {
 		// return lipgloss.PlaceHorizontal(sl.Width, sl.GlobalAlignment, lipgloss.JoinVertical(sl.GlobalAlignment, views...))
-		views = append(views, sl.place(sl.FooterView()))
+		views = append(views, sl.FooterView())
 	}
 	if sl.ShowHelp {
-		views = append(views, sl.place(sl.HelpView()))
+		views = append(views, sl.place(sl.HelpView(), false))
 	}
 	if !sl.ShowFooter && !sl.ShowHelp {
-		views[0] = sl.place(views[0])
+		views[0] = sl.place(views[0], false)
 	}
 	return lipgloss.JoinVertical(sl.GlobalAlignment, views...)
 }
@@ -149,7 +154,7 @@ func (sl *ScrollingList) styleSingle(index int) string {
 }
 
 func (sl *ScrollingList) TitleView() string {
-	return sl.TitleStyle.Render(sl.place(sl.Title))
+	return sl.TitleStyle.Render(sl.place(sl.Title, true))
 }
 
 // returns the rendered footer
@@ -157,12 +162,12 @@ func (sl *ScrollingList) FooterView() string {
 	// ShowFooter handling is done in View
 	var text string
 	if sl.CustomFooter != nil {
-		text = sl.CustomFooter()
+		text = sl.CustomFooter(sl)
 	} else {
 		text = fmt.Sprintf("Focused:%d (ID=%d), First:%d, Last:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d",
 			sl.focused, sl.focusedID, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight)
 	}
-	return sl.FooterStyle.Render(sl.place(text))
+	return sl.FooterStyle.Render(sl.place(text, true))
 }
 
 // returns the rendered help
