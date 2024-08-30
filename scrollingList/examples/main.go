@@ -60,6 +60,7 @@ func main() {
 	list.Title = "\"Top 10 staTues tHat CriEd bloOd\"\nBring Me The Horizon"
 	m := model{list: list}
 	// m.list.CustomFooter = MakeCustomFooter
+	// m.list.MainVerticalAlignment = lipgloss.Center
 	err := tea.NewProgram(
 		m,
 		tea.WithAltScreen(),

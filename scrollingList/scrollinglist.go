@@ -36,6 +36,8 @@ type ScrollingList struct {
 	ListAlignment lipgloss.Position
 	// Alignment of the list and footer w.r.t container
 	GlobalAlignment lipgloss.Position
+	// Vertical alignment of main text when not enough lines to fill screen, defaults to Top
+	MainVerticalAlignment lipgloss.Position
 
 	// Footer can be toggled and customized, can be multiline
 	ShowFooter   bool
@@ -53,8 +55,9 @@ type ScrollingList struct {
 	NumLinesFromBorder int
 
 	// Size of the whole list (scroll height is handled automatically based on footer/help)
-	Width, Height int
-	scrollHeight  int
+	Width, Height     int
+	scrollHeight      int
+	enoughItemsToFill bool
 
 	initialized      bool
 	initializedItems bool
@@ -67,20 +70,21 @@ type ScrollingList struct {
 func NewScrollingList() ScrollingList {
 	InitStyles()
 	return ScrollingList{
-		KeyMap:             DefaultKeyMap(),
-		UnfocusedStyle:     DefaultUnfocusedStyle,
-		FocusedStyle:       DefaultFocusedStyle,
-		FocusedLineStyle:   DefaultFocusedLineStyle,
-		FooterStyle:        DefaultFooterStyle,
-		TitleStyle:         DefaultTitleStyle,
-		ListAlignment:      lipgloss.Center,
-		GlobalAlignment:    lipgloss.Center,
-		NumLinesFromBorder: 5,
-		ShowFooter:         true,
-		ShowTitle:          true,
-		ShowHelp:           true,
-		Help:               help.New(),
-		status:             "uninitialized",
+		KeyMap:                DefaultKeyMap(),
+		UnfocusedStyle:        DefaultUnfocusedStyle,
+		FocusedStyle:          DefaultFocusedStyle,
+		FocusedLineStyle:      DefaultFocusedLineStyle,
+		FooterStyle:           DefaultFooterStyle,
+		TitleStyle:            DefaultTitleStyle,
+		ListAlignment:         lipgloss.Center,
+		GlobalAlignment:       lipgloss.Center,
+		MainVerticalAlignment: lipgloss.Top,
+		NumLinesFromBorder:    5,
+		ShowFooter:            true,
+		ShowTitle:             true,
+		ShowHelp:              true,
+		Help:                  help.New(),
+		status:                "uninitialized",
 	}
 }
 
@@ -105,22 +109,37 @@ func (sl ScrollingList) View() string {
 	}
 	views := make([]string, 0)
 
+	secondaryStuffHeight := 0
+	mainTextIndex := 0
 	if sl.ShowTitle {
-		views = append(views, sl.TitleView())
+		mainTextIndex = 1
+		title := sl.TitleView()
+		secondaryStuffHeight += lipgloss.Height(title)
+		views = append(views, title)
 	}
 
 	views = append(views, lipgloss.JoinVertical(sl.ListAlignment, sl.VisibleLines()...))
+	if !sl.ShowFooter && !sl.ShowHelp {
+		views[mainTextIndex] = sl.place(views[mainTextIndex], false)
+	}
 	if sl.ShowFooter {
 		// return lipgloss.PlaceHorizontal(sl.Width, sl.GlobalAlignment, lipgloss.JoinVertical(sl.GlobalAlignment, views...))
-		views = append(views, sl.FooterView())
+		footer := sl.FooterView()
+		secondaryStuffHeight += lipgloss.Height(footer)
+		views = append(views, footer)
 	}
 	if sl.ShowHelp {
-		views = append(views, sl.place(sl.HelpView(), false))
+		help := sl.place(sl.HelpView(), false)
+		secondaryStuffHeight += lipgloss.Height(help)
+		views = append(views, help)
 	}
-	if !sl.ShowFooter && !sl.ShowHelp {
-		views[0] = sl.place(views[0], false)
+	// Dont really need to check this since PlaceVertical is a noop if given height is less than string height
+	// but i like to think that the if statement is faster than always calling PlaceVertical
+	if !sl.enoughItemsToFill {
+		views[mainTextIndex] = lipgloss.PlaceVertical(sl.Height-secondaryStuffHeight, sl.MainVerticalAlignment, views[mainTextIndex])
 	}
-	return lipgloss.JoinVertical(sl.GlobalAlignment, views...)
+	output := lipgloss.JoinVertical(sl.GlobalAlignment, views...)
+	return output
 }
 
 // returns the visible lines, with partial first/last elements s.t. output fits on screen
@@ -254,6 +273,7 @@ func (sl *ScrollingList) initOrReinit() {
 	if !sl.initializedItems {
 		return
 	}
+	sl.enoughItemsToFill = len(sl.itemIDs) >= sl.Height
 	sl.setLast(sl.firstVisible + (sl.scrollHeight - 1))
 	if diff := sl.lastVisible - sl.firstVisible - sl.scrollHeight + 1; diff < 0 {
 		// i.e. sl.setlast chose len(lines) as minimum
