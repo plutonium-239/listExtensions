@@ -3,6 +3,7 @@ package scrollinglist
 import "github.com/charmbracelet/bubbles/key"
 
 type KeyMap struct {
+	// ! also change the GetAllKeys function when making changes here
 	Down key.Binding
 	Up   key.Binding
 
@@ -21,6 +22,25 @@ type KeyMap struct {
 	ShowHideHelp  key.Binding
 	ToggleFooter  key.Binding
 	ToggleTitle   key.Binding
+}
+
+func (k KeyMap) GetAllKeys() []key.Binding {
+	return []key.Binding{
+		k.Down,
+		k.Up,
+		k.PageDown,
+		k.PageUp,
+		k.GotoBottom,
+		k.GotoTop,
+		k.Quit,
+		k.Edit,
+		k.CancelEdit,
+		k.ShowFullHelp,
+		k.CloseFullHelp,
+		k.ShowHideHelp,
+		k.ToggleFooter,
+		k.ToggleTitle,
+	}
 }
 
 // FullHelp implements help.KeyMap.
