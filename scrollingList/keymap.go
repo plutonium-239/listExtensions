@@ -12,7 +12,9 @@ type KeyMap struct {
 	GotoBottom key.Binding
 	GotoTop    key.Binding
 
-	Quit key.Binding
+	Quit       key.Binding
+	Edit       key.Binding
+	CancelEdit key.Binding
 
 	ShowFullHelp  key.Binding
 	CloseFullHelp key.Binding
@@ -33,6 +35,8 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 			k.GotoTop,
 		},
 		{
+			k.Edit,
+			k.CancelEdit,
 			k.ToggleTitle,
 			k.ToggleFooter,
 			k.ShowHideHelp,
@@ -45,8 +49,9 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 // ShortHelp implements help.KeyMap.
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.Down,
-		k.Up,
+		// doesnt work without specifying keys
+		key.NewBinding(key.WithKeys("up/down"), key.WithHelp("↑/↓", "up/down")),
+		k.Edit,
 		k.Quit,
 		k.ShowFullHelp,
 	}
@@ -82,8 +87,16 @@ func DefaultKeyMap() KeyMap {
 		),
 
 		Quit: key.NewBinding(
-			key.WithKeys("q", "ctrl+c"),
+			key.WithKeys("q", "Q", "ctrl+c", "ctrl+C"),
 			key.WithHelp("q/C^c", "quit"),
+		),
+		Edit: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("↩", "edit/save"),
+		),
+		CancelEdit: key.NewBinding(
+			key.WithKeys("escape", "esc"),
+			key.WithHelp("esc", "cancel edit"),
 		),
 
 		ShowFullHelp: key.NewBinding(

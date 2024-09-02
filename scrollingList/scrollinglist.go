@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -17,6 +18,11 @@ type ScrollingList struct {
 	originalItems []fmt.Stringer
 	lengths       []int
 	focusedID     int
+
+	// read-only or allow edits/add/deletes
+	Editable  bool
+	editor    textinput.Model
+	isEditing bool
 
 	// len(preRendered) NOT EQUAL TO len(lengths) = len(originalItems)
 	// It is supposed to serve as a "flattened" version of the texts in original items
@@ -59,8 +65,9 @@ type ScrollingList struct {
 	scrollHeight      int
 	enoughItemsToFill bool
 
-	initialized      bool
-	initializedItems bool
+	initialized       bool
+	initializedItems  bool
+	initializedEditor bool
 	// KeyMap
 	KeyMap KeyMap
 
@@ -164,6 +171,9 @@ func (sl *ScrollingList) VisibleLines() []string {
 
 func (sl *ScrollingList) styleSingle(index int) string {
 	if index == sl.focused {
+		if sl.isEditing {
+			return lipgloss.PlaceHorizontal(sl.Width, sl.ListAlignment, sl.FocusedLineStyle.Render(sl.editor.View()))
+		}
 		return sl.FocusedLineStyle.Render(sl.preRendered[index])
 	}
 	if sl.itemIDs[index] == sl.focusedID {
@@ -183,8 +193,8 @@ func (sl *ScrollingList) FooterView() string {
 	if sl.CustomFooter != nil {
 		text = sl.CustomFooter(sl)
 	} else {
-		text = fmt.Sprintf("Focused:%d (ID=%d), First:%d, Last:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d",
-			sl.focused, sl.focusedID, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight)
+		text = fmt.Sprintf("Focused:%d (ID=%d), First:%d, Last:%d | Status: %s | main(w,h): (%d,%d) scrollHeight: %d\neditor (init:%v, isEditing:%v): %s",
+			sl.focused, sl.focusedID, sl.firstVisible, sl.lastVisible, sl.status, sl.Width, sl.Height, sl.scrollHeight, sl.initializedEditor, sl.isEditing, sl.editor.Value())
 	}
 	return sl.FooterStyle.Render(sl.place(text, true))
 }
@@ -196,6 +206,25 @@ func (sl *ScrollingList) HelpView() string {
 
 // BubbleTea Update method, handles key presses and window resize
 func (sl ScrollingList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if sl.isEditing {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch {
+			case key.Matches(msg, sl.KeyMap.Edit):
+				sl.completeEditor(false)
+				return sl, nil
+			case key.Matches(msg, sl.KeyMap.CancelEdit):
+				sl.completeEditor(true)
+				return sl, nil
+				// default:
+			}
+		}
+		var cmd tea.Cmd
+		sl.editor, cmd = sl.editor.Update(msg)
+		// sl.preRendered[sl.focused] = sl.editor.Value()
+		return sl, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
@@ -230,6 +259,9 @@ func (sl ScrollingList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, sl.KeyMap.ShowHideHelp):
 			sl.ShowHelp = !sl.ShowHelp
 			sl.SetSize(sl.Width, sl.Height)
+			return sl, nil
+		case key.Matches(msg, sl.KeyMap.Edit):
+			sl.spawnEditor()
 			return sl, nil
 		case key.Matches(msg, sl.KeyMap.ShowFullHelp, sl.KeyMap.CloseFullHelp):
 			sl.Help.ShowAll = !sl.Help.ShowAll
@@ -292,6 +324,38 @@ func (sl *ScrollingList) setFocusedID() {
 		return
 	}
 	sl.focusedID = sl.itemIDs[sl.focused]
+}
+
+func (sl *ScrollingList) spawnEditor() {
+	if !sl.Editable {
+		return
+	}
+	if !sl.initializedEditor {
+		sl.editor = textinput.New()
+		// sl.editor.Width = sl.Width
+		// sl.editor.TextStyle = DefaultEditingStyle
+		sl.editor.Cursor.SetChar("|")
+		sl.editor.Cursor.Blink = true
+		sl.initializedEditor = true
+	}
+	sl.isEditing = true
+	sl.editor.Prompt = ""
+	sl.editor.SetValue(sl.preRendered[sl.focused])
+	sl.editor.Focus()
+
+}
+
+func (sl *ScrollingList) completeEditor(cancel bool) {
+	if !sl.Editable || !sl.initializedEditor {
+		return
+	}
+	if !cancel {
+		sl.preRendered[sl.focused] = sl.editor.Value()
+	}
+	sl.isEditing = false
+	sl.editor.Reset()
+	sl.editor.Blur()
+
 }
 
 // Replace one item at index int with given item
@@ -442,6 +506,14 @@ func (sl *ScrollingList) GetFocusedLine() int {
 	return sl.focused
 }
 
+// Returns the string at given line
+func (sl *ScrollingList) GetItemAtLine(index int) string {
+	// if index < 0 || index >= len(sl.preRendered) {
+	// 	panic(fmt.Sprintf("index %d out of bounds (len = %d)", index, len(sl.preRendered)))
+	// }
+	return sl.preRendered[index]
+}
+
 // Returns the currently focused item id
 func (sl *ScrollingList) GetFocused() int {
 	return sl.focusedID
@@ -457,7 +529,7 @@ func (sl *ScrollingList) GetStatus() string {
 	return sl.status
 }
 
-// Convenience funcitions
+// Convenience functions
 func (sl *ScrollingList) setFirst(value int) {
 	sl.firstVisible = max(value, 0)
 }

@@ -61,6 +61,7 @@ func main() {
 	m := model{list: list}
 	// m.list.CustomFooter = MakeCustomFooter
 	// m.list.MainVerticalAlignment = lipgloss.Center
+	m.list.Editable = true
 	err := tea.NewProgram(
 		m,
 		tea.WithAltScreen(),
@@ -99,7 +100,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
-		t, cmd := m.list.Update(tea.WindowSizeMsg{Width: msg.Width/4, Height: msg.Height})
+		t, cmd := m.list.Update(tea.WindowSizeMsg{Width: msg.Width, Height: msg.Height})
 		m.list = t.(listx.ScrollingList)
 		return m, cmd
 	}

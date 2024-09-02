@@ -29,6 +29,10 @@ var (
 	DefaultTitleStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.AdaptiveColor{Light: "#e2e2e2", Dark: "#1D1D1D"}).
 				Background(lipgloss.Color("#ff0077"))
+
+	DefaultEditingStyle = lipgloss.NewStyle().
+				AlignHorizontal(lipgloss.Center).
+				Background(lipgloss.AdaptiveColor{Light: "#e2e2e2", Dark: "#1D1D1D"})
 	// Border(lipgloss.DoubleBorder(), false, true).
 	// BorderForeground(lipgloss.AdaptiveColor{Light: "#e2e2e2", Dark: "#1D1D1D"}).
 	// BorderBackground(lipgloss.Color("#ff0077"))
