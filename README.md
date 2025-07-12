@@ -2,9 +2,11 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/plutonium-239/listExtensions.svg)](https://pkg.go.dev/github.com/plutonium-239/listExtensions)
 
+![logo](logo-head-transparent.svg)
+
 Provides 2 bubbles:
-1. `basiclist`: Basic list with no pagination, meant for use with viewport (see examples)
-2. `scrollinglist`: Scrollable list (no pagination), (see examples)
+1. `basiclist`: Basic list with no pagination, meant for use with viewport (see [examples](basicList/examples/main.go))
+2. `scrollinglist`: Scrollable list (no pagination), (see [examples](scrollingList/examples/main.go))
 
 Demo (`scrollinglist`):
 [![asciicast](https://asciinema.org/a/663534.svg)](https://asciinema.org/a/663534)
